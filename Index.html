@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>86 Board — Crescent Restaurant Avadi</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222222;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0ede8;
+    --muted: #888880;
+    --green: #2ecc71;
+    --green-dim: rgba(46,204,113,0.12);
+    --green-text: #a8f0c0;
+    --red: #e74c3c;
+    --red-dim: rgba(231,76,60,0.1);
+    --red-text: #f5a0a0;
+    --amber: #f39c12;
+    --accent: #d4a853;
+    --accent-dim: rgba(212,168,83,0.12);
+    --radius: 10px;
+    --font: 'Space Grotesk', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* TOPBAR */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    gap: 10px; flex-wrap: wrap;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { font-size: 20px; }
+  .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.2; }
+  .logo-sub { font-size: 10px; color: var(--accent); font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .clock { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+  .view-toggle { display: flex; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .view-btn { padding: 6px 12px; font-size: 11px; font-weight: 700; font-family: var(--font); background: none; border: none; color: var(--muted); cursor: pointer; transition: all 0.15s; letter-spacing: 0.5px; text-transform: uppercase; }
+  .view-btn.active { background: var(--accent); color: #0f0f0f; }
+
+  /* LAYOUT */
+  .main { padding: 18px 20px; max-width: 1100px; margin: 0 auto; }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .stat-label { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .stat-val { font-size: 26px; font-weight: 700; font-family: var(--mono); letter-spacing: -1px; }
+  .stat-val.green { color: var(--green); }
+  .stat-val.red { color: var(--red); }
+  .stat-val.amber { color: var(--amber); }
+  .stat-val.accent { color: var(--accent); }
+
+  /* TOOLBAR */
+  .toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .search-wrap { flex: 1; min-width: 180px; position: relative; }
+  .search-wrap input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 12px 9px 34px; font-family: var(--font); font-size: 13px; color: var(--text); outline: none; transition: border-color 0.15s; }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap input::placeholder { color: var(--muted); }
+  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
+  .filter-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter-btn { padding: 8px 12px; font-size: 11px; font-weight: 700; font-family: var(--font); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted); cursor: pointer; transition: all 0.15s; letter-spacing: 0.4px; text-transform: uppercase; white-space: nowrap; }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  /* CATEGORY NAV */
+  .cat-nav { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 18px; padding-bottom: 4px; scrollbar-width: none; }
+  .cat-nav::-webkit-scrollbar { display: none; }
+  .cat-nav-btn { padding: 6px 12px; font-size: 11px; font-weight: 600; font-family: var(--font); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
+  .cat-nav-btn:hover { border-color: var(--border2); color: var(--text); }
+  .cat-nav-btn.has-out { border-color: rgba(231,76,60,0.4); color: var(--red); }
+
+  /* CATEGORY SECTION */
+  .category-section { margin-bottom: 24px; }
+  .category-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .category-name { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+  .category-line { flex: 1; height: 1px; background: var(--border); }
+  .cat-counts { font-size: 10px; font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+  .cat-counts .out-count { color: var(--red); }
+
+  /* ITEM GRID */
+  .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+
+  /* ITEM CARD */
+  .item-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: var(--radius); padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; transition: border-color 0.2s, background 0.2s; cursor: pointer; user-select: none; }
+  .item-card:hover { border-color: var(--border2); }
+  .item-card.out { border-left-color: var(--red); background: var(--red-dim); }
+  .item-info { flex: 1; min-width: 0; cursor: pointer; }
+  .item-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.2s; }
+  .item-card.out .item-name { color: var(--muted); }
+  .item-price { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+  .item-time { color: var(--red); font-size: 10px; margin-top: 1px; font-family: var(--mono); }
+
+  /* TOGGLE */
+  .toggle { position: relative; width: 38px; height: 22px; cursor: pointer; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--red-dim); border: 1px solid var(--red); border-radius: 22px; transition: all 0.2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: var(--red); border-radius: 50%; transition: all 0.2s; }
+  .toggle input:checked + .toggle-slider { background: var(--green-dim); border-color: var(--green); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--green); }
+  .toggle input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }
+
+  /* WAITER VIEW */
+  .waiter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .waiter-card { border-radius: var(--radius); padding: 16px 12px; text-align: center; border: 2px solid transparent; transition: all 0.2s; }
+  .waiter-card.available { background: rgba(46,204,113,0.1); border-color: rgba(46,204,113,0.4); }
+  .waiter-card.out { background: rgba(231,76,60,0.08); border-color: rgba(231,76,60,0.3); opacity: 0.65; }
+  .waiter-icon { font-size: 24px; margin-bottom: 6px; display: block; }
+  .waiter-card.out .waiter-icon { filter: grayscale(1); }
+  .waiter-name { font-size: 12px; font-weight: 600; margin-bottom: 5px; line-height: 1.3; }
+  .waiter-card.out .waiter-name { color: var(--muted); text-decoration: line-through; }
+  .waiter-status { font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
+  .waiter-card.available .waiter-status { color: var(--green-text); }
+  .waiter-card.out .waiter-status { color: var(--red-text); }
+
+  /* LOGIN */
+  .login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; z-index: 500; }
+  .login-card { background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; padding: 32px 36px; width: 320px; text-align: center; }
+  .login-logo { font-size: 28px; margin-bottom: 8px; }
+  .login-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .login-card p { font-size: 12px; color: var(--muted); margin-bottom: 22px; }
+  .pin-display { display: flex; gap: 10px; justify-content: center; margin-bottom: 18px; }
+  .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border2); transition: all 0.2s; }
+  .pin-dot.filled { background: var(--accent); border-color: var(--accent); }
+  .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .num-btn { padding: 14px; font-size: 16px; font-weight: 600; font-family: var(--font); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; transition: all 0.12s; }
+  .num-btn:hover { background: var(--border); }
+  .num-btn:active { transform: scale(0.95); }
+  .num-btn.del { font-size: 13px; color: var(--muted); }
+  .num-btn.enter { background: var(--accent); border-color: var(--accent); color: #0f0f0f; }
+  .login-error { color: var(--red); font-size: 12px; margin-top: 10px; min-height: 16px; }
+
+  /* LOGOUT BUTTON */
+  .logout-btn { padding: 4px 10px; font-size: 10px; font-weight: 600; font-family: var(--font); background: transparent; border: 1px solid var(--border2); border-radius: 6px; color: var(--muted); cursor: pointer; transition: all 0.15s; margin-left: 8px; }
+  .logout-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* PULSE DOT */
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 6px; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.75)} }
+
+  /* SYNC BAR */
+  .sync-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 10px 16px; font-size: 12px; font-weight: 600; z-index: 999; transform: translateY(80px); opacity: 0; transition: all 0.3s ease; max-width: 260px; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.green { border-left: 3px solid var(--green); }
+  .toast.red { border-left: 3px solid var(--red); }
+
+  /* RESTORE BTN */
+  .restore-btn { padding: 8px 14px; font-size: 11px; font-weight: 700; font-family: var(--font); background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.3); border-radius: var(--radius); color: var(--red); cursor: pointer; transition: all 0.15s; letter-spacing: 0.4px; text-transform: uppercase; white-space: nowrap; }
+  .restore-btn:hover { background: rgba(231,76,60,0.2); }
+
+  .last-updated { text-align: center; font-size: 10px; color: var(--muted); font-family: var(--mono); padding: 12px 0 4px; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 600px) {
+    .main { padding: 12px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stat-val { font-size: 22px; }
+    .waiter-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+    .item-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">🌙</div>
+    <h2>Manager Access</h2>
+    <p>Crescent Restaurant · 86 Board</p>
+    <div class="pin-display">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div class="numpad">
+      <button class="num-btn" onclick="numPress('1')">1</button>
+      <button class="num-btn" onclick="numPress('2')">2</button>
+      <button class="num-btn" onclick="numPress('3')">3</button>
+      <button class="num-btn" onclick="numPress('4')">4</button>
+      <button class="num-btn" onclick="numPress('5')">5</button>
+      <button class="num-btn" onclick="numPress('6')">6</button>
+      <button class="num-btn" onclick="numPress('7')">7</button>
+      <button class="num-btn" onclick="numPress('8')">8</button>
+      <button class="num-btn" onclick="numPress('9')">9</button>
+      <button class="num-btn del" onclick="numDel()">⌫</button>
+      <button class="num-btn" onclick="numPress('0')">0</button>
+      <button class="num-btn enter" onclick="doLogin()">✓</button>
+    </div>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">
+    <span class="logo-icon">🌙</span>
+    <div>
+      <div class="logo-text">Crescent Restaurant</div>
+      <div class="logo-sub">Avadi · 86 Board</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="view-toggle">
+      <button class="view-btn active" id="btnManager" onclick="setView('manager')">Manager</button>
+      <button class="view-btn" id="btnWaiter" onclick="setView('waiter')">Waiter</button>
+    </div>
+    <button class="logout-btn hidden" id="logoutBtn" onclick="logout()">Logout</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="sync-bar">
+    <span class="live-dot"></span>
+    <span>Live 86 Board · changes save instantly · refresh any device to sync · double-tap the 86'd count to restore all</span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card"><div class="stat-label">Available</div><div class="stat-val green" id="statAvail">—</div></div>
+    <div class="stat-card"><div class="stat-label">86'd / Out</div><div class="stat-val red" id="statOut" title="Double-tap to restore all" style="cursor:pointer">—</div></div>
+    <div class="stat-card"><div class="stat-label">Categories</div><div class="stat-val accent" id="statCats">—</div></div>
+    <div class="stat-card"><div class="stat-label">Total Items</div><div class="stat-val amber" id="statTotal">—</div></div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar" id="managerToolbar">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="searchInput" placeholder="Search item or category…" oninput="renderAll()">
+    </div>
+    <div class="filter-btns">
+      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('available',this)">Available</button>
+      <button class="filter-btn" onclick="setFilter('out',this)">86'd</button>
+    </div>
+    <button class="restore-btn" onclick="restoreAll()">Restore All</button>
+  </div>
+
+  <!-- Category nav (manager) -->
+  <div class="cat-nav" id="catNav"></div>
+
+  <!-- Views -->
+  <div id="managerView"></div>
+  <div id="waiterView" class="hidden"></div>
+
+  <div class="last-updated" id="lastUpdated"></div>
+</div>
+
+<script>
+// Initialize variables FIRST
+const MANAGER_PIN = "1234"; // Change this!
+let pin = "";
+let isManager = false;
+let currentFilter = "all";
+let currentView = "manager";
+let isInitializing = true;
+let syncInProgress = false;
+
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyAaE4r2VvscC9lC2GCOynE4PQ2e8_SkyaE",
+  authDomain: "crescent-86-board.firebaseapp.com",
+  projectId: "crescent-86-board",
+  storageBucket: "crescent-86-board.firebasestorage.app",
+  messagingSenderId: "622277606598",
+  appId: "1:622277606598:web:7e11e285d8bb37169a6bc7"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+// Sign in anonymously
+auth.signInAnonymously().catch(err => console.error("Auth error:", err));
+
+// ── FULL CRESCENT MENU ──────────────────────────────────────────────
+const DEFAULT_MENU = [
+  // Ormakal Uppilittathu
+  {id:1,  name:"Manga Uppilittathu",            cat:"Ormakal Uppilittathu", price:"₹10",   icon:"🥭"},
+  {id:2,  name:"Pineapple Uppilittathu",        cat:"Ormakal Uppilittathu", price:"₹20",   icon:"🍍"},
+  {id:3,  name:"Carrot Uppilittathu",           cat:"Ormakal Uppilittathu", price:"₹10",   icon:"🥕"},
+  {id:4,  name:"Beetroot Uppilittathu",         cat:"Ormakal Uppilittathu", price:"₹10",   icon:"🟣"},
+  {id:5,  name:"Guava Uppilittathu",            cat:"Ormakal Uppilittathu", price:"₹10",   icon:"🍈"},
+  {id:6,  name:"Nellikka Uppilittathu",         cat:"Ormakal Uppilittathu", price:"₹10",   icon:"🟢"},
+  // Soups
+  {id:7,  name:"Chicken Soup",                  cat:"Soups",                price:"₹170",  icon:"🍜"},
+  {id:8,  name:"Mutton Soup",                   cat:"Soups",                price:"₹190",  icon:"🍜"},
+  {id:9,  name:"Mutton Bone Soup",              cat:"Soups",                price:"₹199",  icon:"🦴"},
+  {id:10, name:"Cream of Roasted Mushroom",     cat:"Soups",                price:"₹165",  icon:"🍄"},
+  {id:11, name:"Cream of Roasted Chicken Soup", cat:"Soups",               price:"₹189",  icon:"🍲"},
+  // Sandwiches
+  {id:12, name:"Paneer Cheese Sandwich",        cat:"Sandwiches",           price:"₹149",  icon:"🥪"},
+  {id:13, name:"Veg Cheese Sandwich",           cat:"Sandwiches",           price:"₹99",   icon:"🥪"},
+  {id:14, name:"Mexican Chicken Sandwich",      cat:"Sandwiches",           price:"₹159",  icon:"🥪"},
+  {id:15, name:"Chicken Tikka Sandwich",        cat:"Sandwiches",           price:"₹159",  icon:"🥪"},
+  {id:16, name:"Chicken Cheese Sandwich",       cat:"Sandwiches",           price:"₹149",  icon:"🥪"},
+  // Salad
+  {id:17, name:"Caesar Salad",                  cat:"Salad",                price:"₹169",  icon:"🥗"},
+  {id:18, name:"Dynamite Potato",               cat:"Salad",                price:"₹169",  icon:"🥔"},
+  {id:19, name:"Italian Pasta Salad",           cat:"Salad",                price:"₹179",  icon:"🥗"},
+  {id:20, name:"Greek Salad",                   cat:"Salad",                price:"₹159",  icon:"🥗"},
+  {id:21, name:"Green Salad",                   cat:"Salad",                price:"₹99",   icon:"🥬"},
+  // Pastas
+  {id:22, name:"Creamy White Sauce Pasta (Veg)",     cat:"Pastas",          price:"₹190",  icon:"🍝"},
+  {id:23, name:"Creamy White Sauce Pasta (Chicken)", cat:"Pastas",          price:"₹280",  icon:"🍝"},
+  {id:24, name:"Creamy White Sauce Pasta (Prawn)",   cat:"Pastas",          price:"₹380",  icon:"🍝"},
+  {id:25, name:"Creamy Cheesy Garlic Pasta (Veg)",   cat:"Pastas",          price:"₹225",  icon:"🍝"},
+  {id:26, name:"Creamy Cheesy Garlic Pasta (Chicken)",cat:"Pastas",         price:"₹295",  icon:"🍝"},
+  {id:27, name:"Creamy Cheesy Mushroom Pasta (Veg)", cat:"Pastas",          price:"₹225",  icon:"🍝"},
+  {id:28, name:"Creamy Cheesy Mushroom Pasta (Chicken)",cat:"Pastas",       price:"₹295",  icon:"🍝"},
+  // BBQ
+  {id:29, name:"IFFA Chicken (Half)",           cat:"BBQ Chicken/Fish",     price:"₹299",  icon:"🍗"},
+  {id:30, name:"IFFA Chicken (Full)",           cat:"BBQ Chicken/Fish",     price:"₹567",  icon:"🍗"},
+  {id:31, name:"Grilled Chicken (Half)",        cat:"BBQ Chicken/Fish",     price:"₹259",  icon:"🍗"},
+  {id:32, name:"Grilled Chicken (Full)",        cat:"BBQ Chicken/Fish",     price:"₹469",  icon:"🍗"},
+  {id:33, name:"Mexican BBQ Chicken",           cat:"BBQ Chicken/Fish",     price:"₹319",  icon:"🍗"},
+  {id:34, name:"Moroccan BBQ Chicken",          cat:"BBQ Chicken/Fish",     price:"₹319",  icon:"🍗"},
+  {id:35, name:"Spanish BBQ Chicken",           cat:"BBQ Chicken/Fish",     price:"₹319",  icon:"🍗"},
+  {id:36, name:"Korean BBQ Chicken",            cat:"BBQ Chicken/Fish",     price:"₹319",  icon:"🍗"},
+  {id:37, name:"Crescent BBQ Chicken (Half)",   cat:"BBQ Chicken/Fish",     price:"₹269",  icon:"🍗"},
+  {id:38, name:"Crescent BBQ Chicken (Full)",   cat:"BBQ Chicken/Fish",     price:"₹479",  icon:"🍗"},
+  {id:39, name:"Pepper BBQ Chicken (Half)",     cat:"BBQ Chicken/Fish",     price:"₹279",  icon:"🍗"},
+  {id:40, name:"Pepper BBQ Chicken (Full)",     cat:"BBQ Chicken/Fish",     price:"₹499",  icon:"🍗"},
+  {id:41, name:"Basa Fish BBQ",                 cat:"BBQ Chicken/Fish",     price:"₹429",  icon:"🐟"},
+  {id:42, name:"Pomfret BBQ",                   cat:"BBQ Chicken/Fish",     price:"Seasonal",icon:"🐠"},
+  {id:43, name:"White Snapper BBQ",             cat:"BBQ Chicken/Fish",     price:"Seasonal",icon:"🐠"},
+  {id:44, name:"Koduva Fish BBQ",               cat:"BBQ Chicken/Fish",     price:"Seasonal",icon:"🐠"},
+  // Kebabs
+  {id:45, name:"Tandoori Chicken (Half)",       cat:"Kebabs",               price:"₹259",  icon:"🍢"},
+  {id:46, name:"Tandoori Chicken (Full)",       cat:"Kebabs",               price:"₹465",  icon:"🍢"},
+  {id:47, name:"Chicken Tikka",                 cat:"Kebabs",               price:"₹299",  icon:"🍢"},
+  {id:48, name:"Fish Tikka",                    cat:"Kebabs",               price:"₹399",  icon:"🍢"},
+  {id:49, name:"Red Chicken Kebab",             cat:"Kebabs",               price:"₹289",  icon:"🍢"},
+  {id:50, name:"Malai Chicken Kebab",           cat:"Kebabs",               price:"₹299",  icon:"🍢"},
+  {id:51, name:"Mint Chicken Kebab",            cat:"Kebabs",               price:"₹299",  icon:"🍢"},
+  {id:52, name:"Garlic Chicken Kebab",          cat:"Kebabs",               price:"₹299",  icon:"🍢"},
+  {id:53, name:"Ginger Chicken Kebab",          cat:"Kebabs",               price:"₹299",  icon:"🍢"},
+  {id:54, name:"Chicken Seekh Kebab",           cat:"Kebabs",               price:"₹319",  icon:"🍢"},
+  {id:55, name:"Prawns Tikka",                  cat:"Kebabs",               price:"₹409",  icon:"🦐"},
+  {id:56, name:"Mushroom Tikka",                cat:"Kebabs",               price:"₹249",  icon:"🍄"},
+  {id:57, name:"Pineapple Tikka",               cat:"Kebabs",               price:"₹259",  icon:"🍍"},
+  {id:58, name:"Spanish Chicken Kebab",         cat:"Kebabs",               price:"₹299",  icon:"🍢"},
+  {id:59, name:"Moroccan Chicken Kebab",        cat:"Kebabs",               price:"₹299",  icon:"🍢"},
+  {id:60, name:"Mexican Chicken Kebab",         cat:"Kebabs",               price:"₹299",  icon:"🍢"},
+  {id:61, name:"Korean Chicken Kebab",          cat:"Kebabs",               price:"₹299",  icon:"🍢"},
+  // Platters
+  {id:62, name:"Chicken Platter",               cat:"Platter",              price:"₹1099", icon:"🍽️"},
+  {id:63, name:"Seafood Platter",               cat:"Platter",              price:"₹1199", icon:"🦞"},
+  {id:64, name:"Chicken Kebab Platter",         cat:"Platter",              price:"₹749",  icon:"🍽️"},
+  // Chicken Starters
+  {id:65, name:"Kozhi Porichathu",              cat:"Chicken Starters",     price:"₹155",  icon:"🍗"},
+  {id:66, name:"Chicken 65 (Bone)",             cat:"Chicken Starters",     price:"₹239",  icon:"🍗"},
+  {id:67, name:"Chicken 65 (Boneless)",         cat:"Chicken Starters",     price:"₹259",  icon:"🍗"},
+  {id:68, name:"Dynamite Chicken",              cat:"Chicken Starters",     price:"₹249",  icon:"🍗"},
+  {id:69, name:"Chicken Tikka Cheese Ball",     cat:"Chicken Starters",     price:"₹269",  icon:"🧀"},
+  {id:70, name:"Chicken Finger",                cat:"Chicken Starters",     price:"₹289",  icon:"🍗"},
+  {id:71, name:"Chicken Lollipop (Dry)",        cat:"Chicken Starters",     price:"₹239",  icon:"🍗"},
+  {id:72, name:"Chicken Lollipop (Saucy)",      cat:"Chicken Starters",     price:"₹255",  icon:"🍗"},
+  {id:73, name:"Kerala Chicken 65 (Bone)",      cat:"Chicken Starters",     price:"₹249",  icon:"🍗"},
+  {id:74, name:"Kerala Chicken 65 (Boneless)",  cat:"Chicken Starters",     price:"₹269",  icon:"🍗"},
+  {id:75, name:"Dragon Chicken",                cat:"Chicken Starters",     price:"₹289",  icon:"🐉"},
+  // Wings
+  {id:76, name:"Buffalo Chicken Wings",         cat:"Wings",                price:"₹260",  icon:"🍗"},
+  {id:77, name:"Spicy Cheese Garlic Wings",     cat:"Wings",                price:"₹279",  icon:"🍗"},
+  {id:78, name:"Crescent BBQ Wings",            cat:"Wings",                price:"₹260",  icon:"🍗"},
+  {id:79, name:"Korean BBQ Wings",              cat:"Wings",                price:"₹260",  icon:"🍗"},
+  {id:80, name:"Mexican BBQ Wings",             cat:"Wings",                price:"₹260",  icon:"🍗"},
+  {id:81, name:"Moroccan BBQ Wings",            cat:"Wings",                price:"₹260",  icon:"🍗"},
+  {id:82, name:"Spanish BBQ Wings",             cat:"Wings",                price:"₹260",  icon:"🍗"},
+  // Pollichathu
+  {id:83, name:"Karimeen Pollichathu",          cat:"Pollichathu",          price:"₹399",  icon:"🍃"},
+  {id:84, name:"Prawns Pollichathu",            cat:"Pollichathu",          price:"₹379",  icon:"🦐"},
+  {id:85, name:"Ayala Pollichathu",             cat:"Pollichathu",          price:"₹235",  icon:"🐟"},
+  {id:86, name:"Baasa Pollichathu",             cat:"Pollichathu",          price:"₹445",  icon:"🐟"},
+  {id:87, name:"Chicken Pollichathu",           cat:"Pollichathu",          price:"₹309",  icon:"🍗"},
+  {id:88, name:"Mutton Pollichathu",            cat:"Pollichathu",          price:"₹399",  icon:"🥩"},
+  {id:89, name:"Sear Fish Pollichathu",         cat:"Pollichathu",          price:"₹369",  icon:"🐟"},
+  {id:90, name:"Pomfret Pollichathu",           cat:"Pollichathu",          price:"Seasonal",icon:"🐠"},
+  {id:91, name:"Snapper Pollichathu",           cat:"Pollichathu",          price:"Seasonal",icon:"🐠"},
+  // Seafood Specials
+  {id:92, name:"Crab Lollipop",                 cat:"Seafood Specials",     price:"₹289",  icon:"🦀"},
+  {id:93, name:"Dragon Prawns",                 cat:"Seafood Specials",     price:"₹369",  icon:"🦐"},
+  {id:94, name:"Karimeen Fry",                  cat:"Seafood Specials",     price:"Seasonal",icon:"🐟"},
+  {id:95, name:"Prawns Fry",                    cat:"Seafood Specials",     price:"₹369",  icon:"🦐"},
+  {id:96, name:"Finger Fish",                   cat:"Seafood Specials",     price:"₹369",  icon:"🐟"},
+  {id:97, name:"Nethily Fry",                   cat:"Seafood Specials",     price:"₹259",  icon:"🐟"},
+  {id:98, name:"Ayala Fry",                     cat:"Seafood Specials",     price:"₹189",  icon:"🐟"},
+  {id:99, name:"Pomfret Fry",                   cat:"Seafood Specials",     price:"Seasonal",icon:"🐠"},
+  {id:100,name:"Koduva Fry",                    cat:"Seafood Specials",     price:"Seasonal",icon:"🐠"},
+  {id:101,name:"Snapper Fry",                   cat:"Seafood Specials",     price:"Seasonal",icon:"🐠"},
+  // Mutton Specials
+  {id:102,name:"Mutton Chukka",                 cat:"Mutton Specials",      price:"₹365",  icon:"🥩"},
+  {id:103,name:"Mutton Curry",                  cat:"Mutton Specials",      price:"₹339",  icon:"🍲"},
+  {id:104,name:"Mutton Chettinadu",             cat:"Mutton Specials",      price:"₹349",  icon:"🍲"},
+  {id:105,name:"Kerala Mutton Masala",          cat:"Mutton Specials",      price:"₹355",  icon:"🍲"},
+  // Paneer
+  {id:106,name:"Paneer 65",                     cat:"Paneer",               price:"₹249",  icon:"🧀"},
+  {id:107,name:"Paneer Tikka",                  cat:"Paneer",               price:"₹299",  icon:"🧀"},
+  {id:108,name:"Paneer Butter Masala",          cat:"Paneer",               price:"₹269",  icon:"🧀"},
+  {id:109,name:"Dragon Paneer",                 cat:"Paneer",               price:"₹289",  icon:"🐉"},
+  {id:110,name:"Paneer Manchurian",             cat:"Paneer",               price:"₹259",  icon:"🧀"},
+  // Vegetable
+  {id:111,name:"Gobi 65",                       cat:"Vegetable",            price:"₹179",  icon:"🥦"},
+  {id:112,name:"Babycorn Golden Fry",           cat:"Vegetable",            price:"₹199",  icon:"🌽"},
+  {id:113,name:"Mushroom 65",                   cat:"Vegetable",            price:"₹199",  icon:"🍄"},
+  {id:114,name:"Babycorn Dragon",               cat:"Vegetable",            price:"₹199",  icon:"🌽"},
+  {id:115,name:"Babycorn Manchurian",           cat:"Vegetable",            price:"₹199",  icon:"🌽"},
+  {id:116,name:"Green Peas Masala",             cat:"Vegetable",            price:"₹179",  icon:"🫛"},
+  {id:117,name:"Kadala Curry",                  cat:"Vegetable",            price:"₹179",  icon:"🫘"},
+  {id:118,name:"Mushroom Masala",               cat:"Vegetable",            price:"₹209",  icon:"🍄"},
+  {id:119,name:"Gobi Manchurian",               cat:"Vegetable",            price:"₹199",  icon:"🥦"},
+  {id:120,name:"Veg Curry",                     cat:"Vegetable",            price:"₹149",  icon:"🥘"},
+  // Chicken Gravys
+  {id:121,name:"Kerala Chicken Curry (Bone)",   cat:"Chicken Gravys",       price:"₹259",  icon:"🍲"},
+  {id:122,name:"Kerala Chicken Curry (Boneless)",cat:"Chicken Gravys",      price:"₹289",  icon:"🍲"},
+  {id:123,name:"Butter Chicken Masala (Bone)",  cat:"Chicken Gravys",       price:"₹289",  icon:"🍲"},
+  {id:124,name:"Butter Chicken Masala (Boneless)",cat:"Chicken Gravys",     price:"₹319",  icon:"🍲"},
+  {id:125,name:"Chicken Curry (Bone)",          cat:"Chicken Gravys",       price:"₹229",  icon:"🍲"},
+  {id:126,name:"Chicken Curry (Boneless)",      cat:"Chicken Gravys",       price:"₹249",  icon:"🍲"},
+  {id:127,name:"Chicken Pepper Masala (Bone)",  cat:"Chicken Gravys",       price:"₹249",  icon:"🍲"},
+  {id:128,name:"Chicken Pepper Masala (Boneless)",cat:"Chicken Gravys",     price:"₹289",  icon:"🍲"},
+  {id:129,name:"Chettinadu Chicken (Bone)",     cat:"Chicken Gravys",       price:"₹249",  icon:"🍲"},
+  {id:130,name:"Chettinadu Chicken (Boneless)", cat:"Chicken Gravys",       price:"₹289",  icon:"🍲"},
+  // Egg Dishes
+  {id:131,name:"Boiled Egg",                    cat:"Egg Dishes",           price:"₹39",   icon:"🥚"},
+  {id:132,name:"Egg Masala",                    cat:"Egg Dishes",           price:"₹169",  icon:"🍳"},
+  {id:133,name:"Egg Curry",                     cat:"Egg Dishes",           price:"₹159",  icon:"🍳"},
+  {id:134,name:"Egg Butter Masala",             cat:"Egg Dishes",           price:"₹199",  icon:"🍳"},
+  {id:135,name:"Kadai Egg / Chettinadu",        cat:"Egg Dishes",           price:"₹169",  icon:"🍳"},
+  // Indian Breads
+  {id:136,name:"Parotta",                       cat:"Indian Breads",        price:"₹25",   icon:"🫓"},
+  {id:137,name:"Chapathi",                      cat:"Indian Breads",        price:"₹29",   icon:"🫓"},
+  {id:138,name:"Wheat Parotta",                 cat:"Indian Breads",        price:"₹30",   icon:"🫓"},
+  {id:139,name:"Tandoori Rotti",                cat:"Indian Breads",        price:"₹55",   icon:"🫓"},
+  {id:140,name:"Naan",                          cat:"Indian Breads",        price:"₹59",   icon:"🫓"},
+  {id:141,name:"Butter Naan",                   cat:"Indian Breads",        price:"₹69",   icon:"🫓"},
+  {id:142,name:"Butter Rotti",                  cat:"Indian Breads",        price:"₹64",   icon:"🫓"},
+  {id:143,name:"Garlic Naan",                   cat:"Indian Breads",        price:"₹79",   icon:"🫓"},
+  {id:144,name:"Chilly Cheese Naan",            cat:"Indian Breads",        price:"₹87",   icon:"🫓"},
+  {id:145,name:"Idiyappam",                     cat:"Indian Breads",        price:"₹19",   icon:"🥣"},
+  {id:146,name:"Kerala Rice Pathiri",           cat:"Indian Breads",        price:"₹17",   icon:"🫓"},
+  {id:147,name:"Kulcha",                        cat:"Indian Breads",        price:"₹59",   icon:"🫓"},
+  {id:148,name:"Masala Kulcha",                 cat:"Indian Breads",        price:"₹69",   icon:"🫓"},
+  {id:149,name:"Kuboos",                        cat:"Indian Breads",        price:"₹20",   icon:"🫓"},
+  // Kothu Parotta
+  {id:150,name:"Paal Parotta Chicken",          cat:"Kothu Parotta",        price:"₹329",  icon:"🍛"},
+  {id:151,name:"Paal Parotta Mutton",           cat:"Kothu Parotta",        price:"₹439",  icon:"🍛"},
+  {id:152,name:"Paal Parotta Prawns",           cat:"Kothu Parotta",        price:"₹444",  icon:"🦐"},
+  // Kizhi Parotta
+  {id:153,name:"Mix Veg Kizhi Parotta",         cat:"Kizhi Parotta",        price:"₹209",  icon:"🍃"},
+  {id:154,name:"Mushroom Kizhi Parotta",        cat:"Kizhi Parotta",        price:"₹239",  icon:"🍄"},
+  {id:155,name:"Chicken Kizhi Parotta",         cat:"Kizhi Parotta",        price:"₹279",  icon:"🍗"},
+  {id:156,name:"Mutton Kizhi Parotta",          cat:"Kizhi Parotta",        price:"₹379",  icon:"🥩"},
+  {id:157,name:"Prawn Kizhi Parotta",           cat:"Kizhi Parotta",        price:"₹399",  icon:"🦐"},
+  // Kappa Specials
+  {id:158,name:"Kappa",                         cat:"Kappa Specials",       price:"₹99",   icon:"🥔"},
+  {id:159,name:"Chicken Kappa Biriyani",        cat:"Kappa Specials",       price:"₹255",  icon:"🍛"},
+  {id:160,name:"Mutton Kappa Biriyani",         cat:"Kappa Specials",       price:"₹369",  icon:"🍛"},
+  {id:161,name:"Prawn Kappa Biriyani",          cat:"Kappa Specials",       price:"₹379",  icon:"🦐"},
+  {id:162,name:"Veg Kappa Biriyani",            cat:"Kappa Specials",       price:"₹189",  icon:"🍛"},
+  {id:163,name:"Kappa with Fish Curry",         cat:"Kappa Specials",       price:"₹209",  icon:"🐟"},
+  {id:164,name:"Kappa with Mutton Curry",       cat:"Kappa Specials",       price:"₹229",  icon:"🥩"},
+  {id:165,name:"Kappa with Chicken Curry",      cat:"Kappa Specials",       price:"₹209",  icon:"🍗"},
+  {id:166,name:"Paal Kappa",                    cat:"Kappa Specials",       price:"₹179",  icon:"🥥"},
+  // Ramen Bowl
+  {id:167,name:"Korean Ramen Bowl Paneer",      cat:"Ramen Bowl",           price:"₹299",  icon:"🍜"},
+  {id:168,name:"Korean Ramen Bowl Chicken",     cat:"Ramen Bowl",           price:"₹329",  icon:"🍜"},
+  // Meals
+  {id:169,name:"Veg Meals",                     cat:"Meals",                price:"₹155",  icon:"🍱"},
+  {id:170,name:"Fish Curry Meals",              cat:"Meals",                price:"₹180",  icon:"🍱"},
+  {id:171,name:"Chicken Curry Meals",           cat:"Meals",                price:"₹175",  icon:"🍱"},
+  {id:172,name:"Ayala Fry Meals",               cat:"Meals",                price:"₹309",  icon:"🍱"},
+  {id:173,name:"Mutton Curry Meals",            cat:"Meals",                price:"₹215",  icon:"🍱"},
+  // Biriyani
+  {id:174,name:"Chicken Biriyani",              cat:"Biriyani",             price:"₹239",  icon:"🍚"},
+  {id:175,name:"Mutton Biriyani",               cat:"Biriyani",             price:"₹329",  icon:"🍚"},
+  {id:176,name:"Crescent Spl Biriyani",         cat:"Biriyani",             price:"₹299",  icon:"⭐"},
+  {id:177,name:"Malabar Chicken Biriyani",      cat:"Biriyani",             price:"₹289",  icon:"🍚"},
+  {id:178,name:"Chicken Mughal Biriyani",       cat:"Biriyani",             price:"₹299",  icon:"🍚"},
+  {id:179,name:"Mutton Mughal Biriyani",        cat:"Biriyani",             price:"₹369",  icon:"🍚"},
+  {id:180,name:"Mutton Chukka Biriyani",        cat:"Biriyani",             price:"₹399",  icon:"🍚"},
+  {id:181,name:"Egg Biriyani",                  cat:"Biriyani",             price:"₹199",  icon:"🍚"},
+  {id:182,name:"Fish Biriyani",                 cat:"Biriyani",             price:"₹399",  icon:"🍚"},
+  {id:183,name:"Prawns Biriyani",               cat:"Biriyani",             price:"₹399",  icon:"🦐"},
+  {id:184,name:"Paneer Biriyani",               cat:"Biriyani",             price:"₹289",  icon:"🍚"},
+  {id:185,name:"Mushroom Biriyani",             cat:"Biriyani",             price:"₹289",  icon:"🍄"},
+  {id:186,name:"Veg Biriyani",                  cat:"Biriyani",             price:"₹199",  icon:"🍚"},
+  // Fried Rice
+  {id:187,name:"Burnt Garlic Veg Fried Rice",   cat:"Fried Rice",           price:"₹249",  icon:"🍳"},
+  {id:188,name:"Chilli Butter Veg Fried Rice",  cat:"Fried Rice",           price:"₹249",  icon:"🍳"},
+  {id:189,name:"Hot Garlic Fried Rice",         cat:"Fried Rice",           price:"₹289",  icon:"🍳"},
+  {id:190,name:"Veg Fried Rice",                cat:"Fried Rice",           price:"₹209",  icon:"🍳"},
+  {id:191,name:"Schezwan Veg Fried Rice",       cat:"Fried Rice",           price:"₹229",  icon:"🍳"},
+  {id:192,name:"Mixed Veg Fried Rice",          cat:"Fried Rice",           price:"₹279",  icon:"🍳"},
+  {id:193,name:"Paneer Fried Rice",             cat:"Fried Rice",           price:"₹259",  icon:"🍳"},
+  {id:194,name:"Mushroom Fried Rice",           cat:"Fried Rice",           price:"₹249",  icon:"🍄"},
+  {id:195,name:"Burnt Garlic Chicken Fried Rice",cat:"Fried Rice",          price:"₹289",  icon:"🍳"},
+  {id:196,name:"Chilli Butter Chicken Fried Rice",cat:"Fried Rice",         price:"₹289",  icon:"🍳"},
+  {id:197,name:"Hot Garlic Chicken Fried Rice", cat:"Fried Rice",           price:"₹289",  icon:"🍳"},
+  {id:198,name:"Chicken Fried Rice",            cat:"Fried Rice",           price:"₹249",  icon:"🍳"},
+  {id:199,name:"Schezwan Chicken Fried Rice",   cat:"Fried Rice",           price:"₹269",  icon:"🍳"},
+  {id:200,name:"Mixed Non Veg Fried Rice",      cat:"Fried Rice",           price:"₹369",  icon:"🍳"},
+  {id:201,name:"Egg Fried Rice",                cat:"Fried Rice",           price:"₹219",  icon:"🍳"},
+  {id:202,name:"Prawns Fried Rice",             cat:"Fried Rice",           price:"₹369",  icon:"🦐"},
+  {id:203,name:"Mutton Fried Rice",             cat:"Fried Rice",           price:"₹360",  icon:"🍳"},
+  // Noodles
+  {id:204,name:"Veg Noodles",                   cat:"Noodles",              price:"₹209",  icon:"🍜"},
+  {id:205,name:"Chicken Noodles",               cat:"Noodles",              price:"₹249",  icon:"🍜"},
+  {id:206,name:"Egg Noodles",                   cat:"Noodles",              price:"₹219",  icon:"🍜"},
+  {id:207,name:"Schezwan Veg Noodles",          cat:"Noodles",              price:"₹229",  icon:"🍜"},
+  {id:208,name:"Schezwan Chicken Noodles",      cat:"Noodles",              price:"₹269",  icon:"🍜"},
+  {id:209,name:"Mixed Veg Noodles",             cat:"Noodles",              price:"₹279",  icon:"🍜"},
+  {id:210,name:"Mixed Non Veg Noodles",         cat:"Noodles",              price:"₹369",  icon:"🍜"},
+  {id:211,name:"Mushroom Noodles",              cat:"Noodles",              price:"₹259",  icon:"🍄"},
+  {id:212,name:"Paneer Noodles",                cat:"Noodles",              price:"₹269",  icon:"🍜"},
+  {id:213,name:"Mutton Noodles",                cat:"Noodles",              price:"₹360",  icon:"🍜"},
+  {id:214,name:"Prawns Noodles",                cat:"Noodles",              price:"₹369",  icon:"🦐"},
+  // Combo Specials
+  {id:215,name:"BBQ Chicken + 2 Parotta",       cat:"Combo Specials",       price:"₹199",  icon:"🍽️"},
+  {id:216,name:"Grill Chicken + 2 Parotta",     cat:"Combo Specials",       price:"₹199",  icon:"🍽️"},
+  {id:217,name:"Tandoori Chicken + 2 Parotta",  cat:"Combo Specials",       price:"₹199",  icon:"🍽️"},
+  {id:218,name:"Kozhi Porichathu + 2 Parotta",  cat:"Combo Specials",       price:"₹199",  icon:"🍽️"},
+  {id:219,name:"Chicken Curry + 2 Parotta",     cat:"Combo Specials",       price:"₹199",  icon:"🍽️"},
+  {id:220,name:"Mutton Curry + 2 Parotta",      cat:"Combo Specials",       price:"₹229",  icon:"🍽️"},
+  {id:221,name:"Ghee Rice",                     cat:"Combo Specials",       price:"₹189",  icon:"🍚"},
+  {id:222,name:"Ghee Rice + Chicken Curry",     cat:"Combo Specials",       price:"₹279",  icon:"🍚"},
+  {id:223,name:"Ghee Rice + Mutton Curry",      cat:"Combo Specials",       price:"₹329",  icon:"🍚"},
+  {id:224,name:"Ghee Rice + Fish Curry",        cat:"Combo Specials",       price:"₹309",  icon:"🍚"},
+  {id:225,name:"Ghee Rice + Tandoori Chicken",  cat:"Combo Specials",       price:"₹319",  icon:"🍚"},
+  {id:226,name:"Ghee Rice + BBQ Chicken",       cat:"Combo Specials",       price:"₹319",  icon:"🍚"},
+  {id:227,name:"Ghee Rice + Grill Chicken",     cat:"Combo Specials",       price:"₹319",  icon:"🍚"},
+  {id:228,name:"Ghee Rice + Kozhi Fry",         cat:"Combo Specials",       price:"₹319",  icon:"🍚"},
+  {id:229,name:"Biriyani Rice + Tandoori Chicken",cat:"Combo Specials",     price:"₹329",  icon:"🍚"},
+  {id:230,name:"Biriyani Rice + BBQ Chicken",   cat:"Combo Specials",       price:"₹329",  icon:"🍚"},
+  {id:231,name:"Biriyani Rice + Grill Chicken", cat:"Combo Specials",       price:"₹329",  icon:"🍚"},
+  {id:232,name:"Biriyani Rice + Kozhi Fry",     cat:"Combo Specials",       price:"₹329",  icon:"🍚"},
+  // Chinese Combo
+  {id:233,name:"FR/Noodles + Chilli Chicken",   cat:"Chinese Combo",        price:"₹339",  icon:"🥡"},
+  {id:234,name:"FR/Noodles + Chicken Manchurian",cat:"Chinese Combo",       price:"₹339",  icon:"🥡"},
+  {id:235,name:"FR/Noodles + Chicken Lollipop", cat:"Chinese Combo",        price:"₹339",  icon:"🥡"},
+  {id:236,name:"Veg FR/Noodles + Gobi Manchurian",cat:"Chinese Combo",      price:"₹319",  icon:"🥡"},
+  {id:237,name:"2 Parotta + Chilli Chicken",    cat:"Chinese Combo",        price:"₹219",  icon:"🥡"},
+  {id:238,name:"2 Parotta + Chicken Manchurian",cat:"Chinese Combo",        price:"₹219",  icon:"🥡"},
+  {id:239,name:"2 Parotta + Gobi Manchurian",   cat:"Chinese Combo",        price:"₹209",  icon:"🥡"},
+  // Fresh Juice
+  {id:240,name:"Fresh Lime Soda",               cat:"Fresh Juice",          price:"₹49",   icon:"🍋"},
+  {id:241,name:"Fresh Lime Juice",              cat:"Fresh Juice",          price:"₹45",   icon:"🍋"},
+  {id:242,name:"Sweet Lime Juice",              cat:"Fresh Juice",          price:"₹80",   icon:"🍋"},
+  {id:243,name:"Grape Juice",                   cat:"Fresh Juice",          price:"₹95",   icon:"🍇"},
+  {id:244,name:"Pineapple Juice",               cat:"Fresh Juice",          price:"₹85",   icon:"🍍"},
+  {id:245,name:"Watermelon Juice",              cat:"Fresh Juice",          price:"₹78",   icon:"🍉"},
+  {id:246,name:"Orange Juice",                  cat:"Fresh Juice",          price:"₹99",   icon:"🍊"},
+  {id:247,name:"Pomegranate Juice",             cat:"Fresh Juice",          price:"₹110",  icon:"🔴"},
+  {id:248,name:"Papaya Juice",                  cat:"Fresh Juice",          price:"₹90",   icon:"🍈"},
+  {id:249,name:"Nannari Sarbath",               cat:"Fresh Juice",          price:"₹55",   icon:"🌿"},
+  {id:250,name:"Nannari Soda Sarbath",          cat:"Fresh Juice",          price:"₹59",   icon:"🌿"},
+  {id:251,name:"Mint Lime Juice",               cat:"Fresh Juice",          price:"₹55",   icon:"🌿"},
+  {id:252,name:"Mint Lime Soda",                cat:"Fresh Juice",          price:"₹55",   icon:"🌿"},
+  {id:253,name:"Apple Juice",                   cat:"Fresh Juice",          price:"₹98",   icon:"🍎"},
+  {id:254,name:"Muskmelon Juice",               cat:"Fresh Juice",          price:"₹90",   icon:"🍈"},
+  {id:255,name:"Strawberry Juice",              cat:"Fresh Juice",          price:"₹136",  icon:"🍓"},
+  // Milk Shake
+  {id:256,name:"Chocolate Thick Shake",         cat:"Milk Shake",           price:"₹189",  icon:"🍫"},
+  {id:257,name:"Chikku Shake",                  cat:"Milk Shake",           price:"₹139",  icon:"🥛"},
+  {id:258,name:"Pomegranate Shake",             cat:"Milk Shake",           price:"₹130",  icon:"🔴"},
+  {id:259,name:"Vanilla Thick Shake",           cat:"Milk Shake",           price:"₹164",  icon:"🍦"},
+  {id:260,name:"Strawberry Thick Shake",        cat:"Milk Shake",           price:"₹164",  icon:"🍓"},
+  {id:261,name:"Pista Thick Shake",             cat:"Milk Shake",           price:"₹189",  icon:"🟢"},
+  {id:262,name:"Black Currant Thick Shake",     cat:"Milk Shake",           price:"₹189",  icon:"🫐"},
+  {id:263,name:"Apple Milk Shake",              cat:"Milk Shake",           price:"₹135",  icon:"🍎"},
+  {id:264,name:"Fig Shake",                     cat:"Milk Shake",           price:"₹145",  icon:"🥛"},
+  {id:265,name:"Butter Fruit Shake",            cat:"Milk Shake",           price:"₹149",  icon:"🥑"},
+  {id:266,name:"Dates Shake",                   cat:"Milk Shake",           price:"₹159",  icon:"🟤"},
+  {id:267,name:"Butterscotch Shake",            cat:"Milk Shake",           price:"₹189",  icon:"🍮"},
+  {id:268,name:"Jugged Specials",               cat:"Milk Shake",           price:"₹159",  icon:"🥛"},
+  {id:269,name:"Sharjah Shake",                 cat:"Milk Shake",           price:"₹139",  icon:"🥛"},
+  {id:270,name:"Mango Milk Shake",              cat:"Milk Shake",           price:"₹189",  icon:"🥭"},
+  {id:271,name:"Banana Shake",                  cat:"Milk Shake",           price:"₹129",  icon:"🍌"},
+  {id:272,name:"Jigarthanda (Dry Fruits)",      cat:"Milk Shake",           price:"₹189",  icon:"🥛"},
+  // Falooda
+  {id:273,name:"Mix Fruit Falooda",             cat:"Falooda",              price:"₹179",  icon:"🍨"},
+  {id:274,name:"Royal Falooda",                 cat:"Falooda",              price:"₹210",  icon:"👑"},
+  {id:275,name:"Dry Fruit Falooda",             cat:"Falooda",              price:"₹189",  icon:"🍨"},
+  {id:276,name:"Kulfi Dry Fruit Falooda",       cat:"Falooda",              price:"₹189",  icon:"🍨"},
+  {id:277,name:"Tender Coconut Falooda",        cat:"Falooda",              price:"₹189",  icon:"🥥"},
+  {id:278,name:"Chocolate Fully Loaded Falooda",cat:"Falooda",              price:"₹189",  icon:"🍫"},
+  {id:279,name:"Mango Falooda",                 cat:"Falooda",              price:"₹179",  icon:"🥭"},
+  {id:280,name:"Gulab Jamun Falooda",           cat:"Falooda",              price:"₹230",  icon:"🍮"},
+  {id:281,name:"Berry Up",                      cat:"Falooda",              price:"₹230",  icon:"🍓"},
+  {id:282,name:"Pull Me Up",                    cat:"Falooda",              price:"₹230",  icon:"🍨"},
+  // Desserts
+  {id:283,name:"Avil Milk",                     cat:"Desserts",             price:"₹135",  icon:"🥣"},
+  {id:284,name:"Cut Fruits",                    cat:"Desserts",             price:"₹104",  icon:"🍱"},
+  {id:285,name:"Fruit Salad",                   cat:"Desserts",             price:"₹104",  icon:"🍱"},
+  {id:286,name:"Fruit Salad with Ice Cream",    cat:"Desserts",             price:"₹175",  icon:"🍨"},
+  {id:287,name:"Ada Payasam",                   cat:"Desserts",             price:"₹120",  icon:"🍮"},
+  {id:288,name:"Crème Caramel Flan",            cat:"Desserts",             price:"₹140",  icon:"🍮"},
+  {id:289,name:"Custard Fruit",                 cat:"Desserts",             price:"₹120",  icon:"🍮"},
+  {id:290,name:"Coconut Soufflé",               cat:"Desserts",             price:"₹125",  icon:"🥥"},
+  {id:291,name:"Gulab Jamun (2 pcs)",           cat:"Desserts",             price:"₹99",   icon:"🍮"},
+  {id:292,name:"Gulab Jamun with Ice Cream",    cat:"Desserts",             price:"₹159",  icon:"🍨"},
+  {id:293,name:"Rabdi Gulab Jamun",             cat:"Desserts",             price:"₹159",  icon:"🍮"},
+  {id:294,name:"Brownie",                       cat:"Desserts",             price:"₹105",  icon:"🍫"},
+  {id:295,name:"Brownie with Ice Cream",        cat:"Desserts",             price:"₹180",  icon:"🍨"},
+  {id:296,name:"Sizzling Brownie",              cat:"Desserts",             price:"₹220",  icon:"🍫"},
+  {id:297,name:"Cloud Pudding",                 cat:"Desserts",             price:"₹140",  icon:"☁️"},
+  {id:298,name:"Arabian Grape",                 cat:"Desserts",             price:"₹120",  icon:"🍇"},
+  {id:299,name:"Kunafa",                        cat:"Desserts",             price:"₹229",  icon:"🍯"},
+  {id:300,name:"Biscoff Kunafa",                cat:"Desserts",             price:"₹274",  icon:"🍯"},
+  {id:301,name:"Kunafa with Ice Cream",         cat:"Desserts",             price:"₹289",  icon:"🍨"},
+  {id:302,name:"Biscoff Kunafa with Ice Cream", cat:"Desserts",             price:"₹324",  icon:"🍨"},
+  {id:303,name:"Lava Favour",                   cat:"Desserts",             price:"₹189",  icon:"🍫"},
+  {id:304,name:"Crème Brûlée",                  cat:"Desserts",             price:"₹174",  icon:"🍮"},
+  {id:305,name:"Shahi Tukda",                   cat:"Desserts",             price:"₹169",  icon:"🍮"},
+  {id:306,name:"Red Velvet Muffin with Ice Cream",cat:"Desserts",           price:"₹189",  icon:"🍰"},
+  // Smoothies
+  {id:307,name:"Strawberry Smoothie",           cat:"Smoothies",            price:"₹189",  icon:"🍓"},
+  {id:308,name:"Blueberry Smoothie",            cat:"Smoothies",            price:"₹189",  icon:"🫐"},
+  {id:309,name:"Pineapple Smoothie",            cat:"Smoothies",            price:"₹189",  icon:"🍍"},
+  {id:310,name:"Mango Smoothie",                cat:"Smoothies",            price:"₹189",  icon:"🥭"},
+  {id:311,name:"Butterscotch Smoothie",         cat:"Smoothies",            price:"₹189",  icon:"🍮"},
+  // Mojitos
+  {id:312,name:"Blueberry Mojito",              cat:"Mojitos",              price:"₹135",  icon:"🫐"},
+  {id:313,name:"Watermelon Mojito",             cat:"Mojitos",              price:"₹135",  icon:"🍉"},
+  {id:314,name:"Green Apple Mojito",            cat:"Mojitos",              price:"₹135",  icon:"🍏"},
+  {id:315,name:"Cool Blue Mojito",              cat:"Mojitos",              price:"₹140",  icon:"💙"},
+  {id:316,name:"Mint Mojito",                   cat:"Mojitos",              price:"₹135",  icon:"🌿"},
+  {id:317,name:"Strawberry Mojito",             cat:"Mojitos",              price:"₹140",  icon:"🍓"},
+  {id:318,name:"Peach Mojito",                  cat:"Mojitos",              price:"₹135",  icon:"🍑"},
+  {id:319,name:"Passion Fruit Mojito",          cat:"Mojitos",              price:"₹135",  icon:"🌺"},
+  // Ice Cream
+  {id:320,name:"Strawberry Ice Cream",          cat:"Ice Cream",            price:"₹104",  icon:"🍓"},
+  {id:321,name:"Mango Ice Cream",               cat:"Ice Cream",            price:"₹130",  icon:"🥭"},
+  {id:322,name:"Vanilla Ice Cream",             cat:"Ice Cream",            price:"₹104",  icon:"🍦"},
+  {id:323,name:"Butterscotch Ice Cream",        cat:"Ice Cream",            price:"₹130",  icon:"🍮"},
+  {id:324,name:"Black Currant Ice Cream",       cat:"Ice Cream",            price:"₹140",  icon:"🫐"},
+  {id:325,name:"Pista Ice Cream",               cat:"Ice Cream",            price:"₹130",  icon:"🟢"},
+  {id:326,name:"Chocolate Ice Cream",           cat:"Ice Cream",            price:"₹130",  icon:"🍫"},
+  {id:327,name:"Kulfi Ice Cream",               cat:"Ice Cream",            price:"₹140",  icon:"🍦"},
+  {id:328,name:"Red Velvet Ice Cream",          cat:"Ice Cream",            price:"₹140",  icon:"🍰"},
+  {id:329,name:"Tender Coconut Ice Cream",      cat:"Ice Cream",            price:"₹140",  icon:"🥥"},
+];
+
+let menu = [];
+
+function init() {
+  loadMenu();
+  updateStats();
+  renderCatNav();
+  renderAll();
+  startClock();
+  checkSession();
+  
+  // Load initial data from Firestore
+  db.collection("restaurant").doc("menu_data").get().then(doc => {
+    if (doc.exists && doc.data().items) {
+      const data = doc.data();
+      menu = DEFAULT_MENU.map(item => {
+        const f = data.items.find(x => x.id === item.id);
+        return f ? { ...item, status: f.status, outSince: f.outSince || null } : { ...item, status: "available" };
+      });
+      renderAll();
+      updateStats();
+    }
+    isInitializing = false;
+    setupRealtimeSync();
+  }).catch(err => {
+    console.error("Firestore load error:", err);
+    showToast("Firebase connection failed", "red");
+  });
+  
+  setInterval(() => { renderCatNav(); updateStats(); }, 10000);
+}
+
+function checkSession() {
+  // Use localStorage so login persists across tabs
+  if (localStorage.getItem("crescent_manager") === "true") {
+    isManager = true;
+    document.getElementById("loginOverlay").style.display = "none";
+    document.getElementById("logoutBtn").classList.remove("hidden");
+  }
+}
+
+// ── STORAGE ────────────────────────────────────────────────────────
+function loadMenu() {
+  menu = DEFAULT_MENU.map(i => ({ ...i, status: "available" }));
+}
+
+function saveMenu() {
+  if (syncInProgress) return;
+  if (!isManager) return;
+  syncInProgress = true;
+  
+  const menuData = menu.map(i => ({ id: i.id, status: i.status, outSince: i.outSince || null }));
+  
+  db.collection("restaurant").doc("menu_data").set({
+    items: menuData,
+    lastUpdated: new Date().toISOString(),
+    updatedBy: auth?.currentUser?.uid || "unknown"
+  }).then(() => {
+    document.getElementById("lastUpdated").textContent =
+      "Last saved: " + new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    syncInProgress = false;
+  }).catch(err => {
+    console.error("Firestore save error:", err);
+    showToast("Save failed - check connection", "red");
+    syncInProgress = false;
+  });
+}
+
+function setupRealtimeSync() {
+  // Listen for changes from other devices
+  db.collection("restaurant").doc("menu_data").onSnapshot((doc) => {
+    if (isInitializing) return;
+    
+    const data = doc.data();
+    if (data && data.items && !syncInProgress) {
+      syncInProgress = true;
+      menu = DEFAULT_MENU.map(item => {
+        const f = data.items.find(x => x.id === item.id);
+        return f ? { ...item, status: f.status, outSince: f.outSince || null } : { ...item, status: "available" };
+      });
+      updateStats();
+      renderCatNav();
+      renderAll();
+      showToast("Updated from other device", "green");
+      syncInProgress = false;
+    }
+  }, (err) => {
+    console.error("Firestore sync error:", err);
+    showToast("Sync error - check connection", "red");
+  });
+}
+
+// ── TOGGLE (FIXED) ─────────────────────────────────────────────────
+function toggleItem(id, event) {
+  // Prevent any parent handlers from firing
+  if (event) {
+    event.stopPropagation();
+  }
+  
+  if (!isManager) {
+    showToast("Manager access required", "red");
+    if (event && event.target) {
+      event.target.checked = !event.target.checked;
+    }
+    return;
+  }
+  
+  const item = menu.find(i => i.id === id);
+  if (!item) return;
+  
+  if (item.status === "available") {
+    item.status = "out";
+    item.outSince = new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    showToast("86'd: " + item.name, "red");
+  } else {
+    item.status = "available";
+    item.outSince = null;
+    showToast("Restored: " + item.name, "green");
+  }
+  saveMenu();
+  updateStats();
+  renderCatNav();
+  renderAll();
+}
+
+function restoreAll() {
+  if (!isManager) {
+    showToast("Manager access required", "red");
+    return;
+  }
+  const outCount = menu.filter(i => i.status === "out").length;
+  if (outCount === 0) { showToast("All items already available!", "green"); return; }
+  if (!confirm("Restore all " + outCount + " items to available?")) return;
+  menu.forEach(i => { i.status = "available"; i.outSince = null; });
+  saveMenu();
+  updateStats();
+  renderCatNav();
+  renderAll();
+  showToast("All " + outCount + " items restored!", "green");
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────
+function getFiltered() {
+  const q = (document.getElementById("searchInput")?.value || "").toLowerCase().trim();
+  return menu.filter(item => {
+    const mf = currentFilter === "all" || item.status === currentFilter;
+    const mq = !q || item.name.toLowerCase().includes(q) || item.cat.toLowerCase().includes(q);
+    return mf && mq;
+  });
+}
+
+function renderAll() {
+  currentView === "manager" ? renderManager() : renderWaiter();
+}
+
+function renderManager() {
+  const filtered = getFiltered();
+  const cats = [...new Set(filtered.map(i => i.cat))];
+  const el = document.getElementById("managerView");
+  if (!filtered.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px;">No items match.</div>';
+    return;
+  }
+  el.innerHTML = cats.map(cat => {
+    const items = filtered.filter(i => i.cat === cat);
+    const outN = items.filter(i => i.status === "out").length;
+    return `<div class="category-section" id="cat-${cat.replace(/\s+/g,'-')}">
+      <div class="category-header">
+        <span class="category-name">${cat}</span>
+        <div class="category-line"></div>
+        <span class="cat-counts">${items.length - outN} avail${outN ? ' · <span class="out-count">' + outN + ' 86\'d</span>' : ''}</span>
+      </div>
+      <div class="item-grid">
+        ${items.map(item => `
+          <div class="item-card ${item.status}">
+            <div class="item-info" onclick="if(isManager) toggleItem(${item.id})">
+              <div class="item-name">${item.icon} ${item.name}</div>
+              <div class="item-price">${item.price}</div>
+              ${item.outSince ? `<div class="item-time">86'd @ ${item.outSince}</div>` : ''}
+            </div>
+            <label class="toggle">
+              <input type="checkbox" data-item-id="${item.id}" ${item.status === "available" ? "checked" : ""} ${!isManager ? "disabled" : ""} onchange="toggleItem(${item.id}, event)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderWaiter() {
+  const cats = [...new Set(menu.map(i => i.cat))];
+  document.getElementById("waiterView").innerHTML = cats.map(cat => {
+    const items = menu.filter(i => i.cat === cat);
+    return `<div class="category-section">
+      <div class="category-header">
+        <span class="category-name">${cat}</span>
+        <div class="category-line"></div>
+      </div>
+      <div class="waiter-grid">
+        ${items.map(item => `
+          <div class="waiter-card ${item.status}">
+            <span class="waiter-icon">${item.icon}</span>
+            <div class="waiter-name">${item.name}</div>
+            <div class="waiter-status">${item.status === "available" ? "Available" : "86'd"}</div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ── CATEGORY NAV ───────────────────────────────────────────────────
+function renderCatNav() {
+  const cats = [...new Set(menu.map(i => i.cat))];
+  document.getElementById("catNav").innerHTML = cats.map(cat => {
+    const hasOut = menu.some(i => i.cat === cat && i.status === "out");
+    return `<button class="cat-nav-btn ${hasOut ? 'has-out' : ''}" onclick="scrollToCat('${cat}')">${cat}${hasOut ? ' ●' : ''}</button>`;
+  }).join("");
+}
+
+function scrollToCat(cat) {
+  const id = "cat-" + cat.replace(/\s+/g, '-');
+  document.getElementById(id)?.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ── STATS ──────────────────────────────────────────────────────────
+function updateStats() {
+  const avail = menu.filter(i => i.status === "available").length;
+  const out = menu.filter(i => i.status === "out").length;
+  const cats = new Set(menu.map(i => i.cat)).size;
+  document.getElementById("statAvail").textContent = avail;
+  document.getElementById("statOut").textContent = out;
+  document.getElementById("statCats").textContent = cats;
+  document.getElementById("statTotal").textContent = menu.length;
+}
+
+document.getElementById("statOut").addEventListener("dblclick", restoreAll);
+
+// ── VIEW SWITCH ────────────────────────────────────────────────────
+function setView(v) {
+  currentView = v;
+  document.getElementById("btnManager").classList.toggle("active", v === "manager");
+  document.getElementById("btnWaiter").classList.toggle("active", v === "waiter");
+  document.getElementById("managerView").classList.toggle("hidden", v !== "manager");
+  document.getElementById("waiterView").classList.toggle("hidden", v !== "waiter");
+  document.getElementById("managerToolbar").classList.toggle("hidden", v !== "manager");
+  document.getElementById("catNav").classList.toggle("hidden", v !== "manager");
+  renderAll();
+}
+
+// ── FILTER ─────────────────────────────────────────────────────────
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderAll();
+}
+
+// ── PIN LOGIN (FIXED) ──────────────────────────────────────────────
+function numPress(n) {
+  if (pin.length >= 4) return;
+  pin += n;
+  updateDots();
+  if (pin.length === 4) setTimeout(doLogin, 120);
+}
+function numDel() {
+  pin = pin.slice(0, -1);
+  updateDots();
+  document.getElementById("loginError").textContent = "";
+}
+function updateDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById("d" + i).classList.toggle("filled", i < pin.length);
+  }
+}
+function doLogin() {
+  if (pin === MANAGER_PIN) {
+    isManager = true;
+    localStorage.setItem("crescent_manager", "true");  // Changed from sessionStorage
+    document.getElementById("loginOverlay").style.display = "none";
+    document.getElementById("logoutBtn").classList.remove("hidden");
+    showToast("Manager access granted", "green");
+    pin = "";
+    updateDots();
+    renderAll(); // Re-render to enable toggles
+  } else {
+    document.getElementById("loginError").textContent = "Incorrect PIN. Try again.";
+    pin = "";
+    updateDots();
+  }
+}
+
+// ── LOGOUT ─────────────────────────────────────────────────────────
+function logout() {
+  isManager = false;
+  localStorage.removeItem("crescent_manager");
+  document.getElementById("loginOverlay").style.display = "flex";
+  document.getElementById("logoutBtn").classList.add("hidden");
+  pin = "";
+  updateDots();
+  document.getElementById("loginError").textContent = "";
+  renderAll(); // Re-render to disable toggles
+  showToast("Logged out", "");
+}
+
+// ── TOAST ──────────────────────────────────────────────────────────
+let toastT;
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast show " + (type || "");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+// ── CLOCK ──────────────────────────────────────────────────────────
+function startClock() {
+  const tick = () => document.getElementById("clock").textContent =
+    new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  tick(); setInterval(tick, 1000);
+}
+
+init();
+</script>
+</body>
+</html>
