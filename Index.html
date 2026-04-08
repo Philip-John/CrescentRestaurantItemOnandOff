@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>86 Board — Crescent Restaurant Avadi</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+<!-- Firebase SDK v9 (Compat) - More stable -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
   :root {
     --bg: #0f0f0f;
@@ -271,7 +271,7 @@
 </div>
 
 <script>
-// Initialize variables FIRST
+// Initialize all variables FIRST
 const MANAGER_PIN = "1234"; // Change this!
 let pin = "";
 let isManager = false;
@@ -279,6 +279,8 @@ let currentFilter = "all";
 let currentView = "manager";
 let isInitializing = true;
 let syncInProgress = false;
+let menu = [];
+let toastT = null;
 
 // Firebase config
 const firebaseConfig = {
@@ -666,8 +668,6 @@ const DEFAULT_MENU = [
   {id:329,name:"Tender Coconut Ice Cream",      cat:"Ice Cream",            price:"₹140",  icon:"🥥"},
 ];
 
-let menu = [];
-
 function init() {
   loadMenu();
   updateStats();
@@ -971,7 +971,6 @@ function logout() {
 }
 
 // ── TOAST ──────────────────────────────────────────────────────────
-let toastT;
 function showToast(msg, type) {
   const t = document.getElementById("toast");
   t.textContent = msg;
