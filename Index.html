@@ -85,7 +85,7 @@
   .cat-nav-btn.has-out { border-color: rgba(231,76,60,0.4); color: var(--red); }
 
   /* CATEGORY SECTION */
-  .category-section { margin-bottom: 24px; }
+  .category-section { margin-bottom: 24px; scroll-margin-top: 120px; }
   .category-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .category-name { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
   .category-line { flex: 1; height: 1px; background: var(--border); }
@@ -142,6 +142,7 @@
   .num-btn:active { transform: scale(0.95); }
   .num-btn.del { font-size: 13px; color: var(--muted); }
   .num-btn.enter { background: var(--accent); border-color: var(--accent); color: #0f0f0f; }
+  .num-btn.cancel { background: var(--red-dim); border-color: var(--red); color: var(--red); font-size: 11px; font-weight: 700; }
   .login-error { color: var(--red); font-size: 12px; margin-top: 10px; min-height: 16px; }
 
   /* LOGOUT BUTTON */
@@ -164,6 +165,13 @@
   /* RESTORE BTN */
   .restore-btn { padding: 8px 14px; font-size: 11px; font-weight: 700; font-family: var(--font); background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.3); border-radius: var(--radius); color: var(--red); cursor: pointer; transition: all 0.15s; letter-spacing: 0.4px; text-transform: uppercase; white-space: nowrap; }
   .restore-btn:hover { background: rgba(231,76,60,0.2); }
+
+  /* PIN PROMPT OVERLAY (for restore all) */
+  .pin-prompt-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.82); display: flex; align-items: center; justify-content: center; z-index: 600; }
+  .pin-prompt-card { background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; padding: 28px 30px; width: 300px; text-align: center; }
+  .pin-prompt-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .pin-prompt-card .sub { font-size: 11px; color: var(--muted); margin-bottom: 18px; }
+  .pin-prompt-card .numpad { margin-bottom: 8px; }
 
   .last-updated { text-align: center; font-size: 10px; color: var(--muted); font-family: var(--mono); padding: 12px 0 4px; }
   .hidden { display: none !important; }
@@ -209,6 +217,36 @@
   </div>
 </div>
 
+<!-- PIN PROMPT FOR RESTORE ALL -->
+<div class="pin-prompt-overlay hidden" id="restorePinOverlay">
+  <div class="pin-prompt-card">
+    <h3>⚠️ Restore All Items</h3>
+    <p class="sub">This will make ALL items available again.<br>Enter manager PIN to confirm.</p>
+    <div class="pin-display">
+      <div class="pin-dot" id="rd0"></div>
+      <div class="pin-dot" id="rd1"></div>
+      <div class="pin-dot" id="rd2"></div>
+      <div class="pin-dot" id="rd3"></div>
+    </div>
+    <div class="numpad">
+      <button class="num-btn" onclick="restoreNumPress('1')">1</button>
+      <button class="num-btn" onclick="restoreNumPress('2')">2</button>
+      <button class="num-btn" onclick="restoreNumPress('3')">3</button>
+      <button class="num-btn" onclick="restoreNumPress('4')">4</button>
+      <button class="num-btn" onclick="restoreNumPress('5')">5</button>
+      <button class="num-btn" onclick="restoreNumPress('6')">6</button>
+      <button class="num-btn" onclick="restoreNumPress('7')">7</button>
+      <button class="num-btn" onclick="restoreNumPress('8')">8</button>
+      <button class="num-btn" onclick="restoreNumPress('9')">9</button>
+      <button class="num-btn del" onclick="restoreNumDel()">⌫</button>
+      <button class="num-btn" onclick="restoreNumPress('0')">0</button>
+      <button class="num-btn enter" onclick="confirmRestoreAll()">✓</button>
+    </div>
+    <button class="num-btn cancel" style="width:100%;margin-top:10px;" onclick="cancelRestoreAll()">Cancel</button>
+    <div class="login-error" id="restorePinError"></div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -235,18 +273,18 @@
 <div class="main">
   <div class="sync-bar">
     <span class="live-dot"></span>
-    <span>Live 86 Board · changes save instantly · refresh any device to sync · double-tap the 86'd count to restore all</span>
+    <span>Live 86 Board · changes save instantly · refresh any device to sync</span>
   </div>
 
   <!-- Stats -->
   <div class="stats">
     <div class="stat-card"><div class="stat-label">Available</div><div class="stat-val green" id="statAvail">—</div></div>
-    <div class="stat-card"><div class="stat-label">86'd / Out</div><div class="stat-val red" id="statOut" title="Double-tap to restore all" style="cursor:pointer">—</div></div>
+    <div class="stat-card"><div class="stat-label">86'd / Out</div><div class="stat-val red" id="statOut">—</div></div>
     <div class="stat-card"><div class="stat-label">Categories</div><div class="stat-val accent" id="statCats">—</div></div>
     <div class="stat-card"><div class="stat-label">Total Items</div><div class="stat-val amber" id="statTotal">—</div></div>
   </div>
 
-  <!-- Toolbar -->
+  <!-- Toolbar (Manager only) -->
   <div class="toolbar" id="managerToolbar">
     <div class="search-wrap">
       <span class="search-icon">⌕</span>
@@ -257,10 +295,10 @@
       <button class="filter-btn" onclick="setFilter('available',this)">Available</button>
       <button class="filter-btn" onclick="setFilter('out',this)">86'd</button>
     </div>
-    <button class="restore-btn" onclick="restoreAll()">Restore All</button>
+    <button class="restore-btn" onclick="promptRestoreAll()">Restore All</button>
   </div>
 
-  <!-- Category nav (manager) -->
+  <!-- Category nav (shown in both views) -->
   <div class="cat-nav" id="catNav"></div>
 
   <!-- Views -->
@@ -271,9 +309,10 @@
 </div>
 
 <script>
-// Initialize all variables FIRST
+// ── GLOBALS ────────────────────────────────────────────────────────
 const MANAGER_PIN = "1234"; // Change this!
 let pin = "";
+let restorePin = "";
 let isManager = false;
 let currentFilter = "all";
 let currentView = "manager";
@@ -892,7 +931,6 @@ function init() {
 }
 
 function checkSession() {
-  // Use localStorage so login persists across tabs
   if (localStorage.getItem("crescent_manager") === "true") {
     isManager = true;
     document.getElementById("loginOverlay").style.display = "none";
@@ -928,7 +966,6 @@ function saveMenu() {
 }
 
 function setupRealtimeSync() {
-  // Listen for changes from other devices
   db.collection("restaurant").doc("menu_data").onSnapshot((doc) => {
     if (isInitializing) return;
     
@@ -951,9 +988,8 @@ function setupRealtimeSync() {
   });
 }
 
-// ── TOGGLE (FIXED) ─────────────────────────────────────────────────
+// ── TOGGLE ─────────────────────────────────────────────────────────
 function toggleItem(id, event) {
-  // Prevent any parent handlers from firing
   if (event) {
     event.stopPropagation();
   }
@@ -984,20 +1020,61 @@ function toggleItem(id, event) {
   renderAll();
 }
 
-function restoreAll() {
-  if (!isManager) {
-    showToast("Manager access required", "red");
-    return;
-  }
+// ── RESTORE ALL (NOW WITH PIN VERIFICATION) ────────────────────────
+function promptRestoreAll() {
   const outCount = menu.filter(i => i.status === "out").length;
-  if (outCount === 0) { showToast("All items already available!", "green"); return; }
-  if (!confirm("Restore all " + outCount + " items to available?")) return;
-  menu.forEach(i => { i.status = "available"; i.outSince = null; });
-  saveMenu();
-  updateStats();
-  renderCatNav();
-  renderAll();
-  showToast("All " + outCount + " items restored!", "green");
+  if (outCount === 0) { 
+    showToast("All items already available!", "green"); 
+    return; 
+  }
+  // Show the PIN prompt overlay
+  restorePin = "";
+  updateRestoreDots();
+  document.getElementById("restorePinError").textContent = "";
+  document.getElementById("restorePinOverlay").classList.remove("hidden");
+}
+
+function restoreNumPress(n) {
+  if (restorePin.length >= 4) return;
+  restorePin += n;
+  updateRestoreDots();
+  if (restorePin.length === 4) setTimeout(confirmRestoreAll, 120);
+}
+
+function restoreNumDel() {
+  restorePin = restorePin.slice(0, -1);
+  updateRestoreDots();
+  document.getElementById("restorePinError").textContent = "";
+}
+
+function updateRestoreDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById("rd" + i).classList.toggle("filled", i < restorePin.length);
+  }
+}
+
+function confirmRestoreAll() {
+  if (restorePin === MANAGER_PIN) {
+    const outCount = menu.filter(i => i.status === "out").length;
+    menu.forEach(i => { i.status = "available"; i.outSince = null; });
+    saveMenu();
+    updateStats();
+    renderCatNav();
+    renderAll();
+    showToast("All " + outCount + " items restored!", "green");
+    cancelRestoreAll();
+  } else {
+    document.getElementById("restorePinError").textContent = "Incorrect PIN. Try again.";
+    restorePin = "";
+    updateRestoreDots();
+  }
+}
+
+function cancelRestoreAll() {
+  restorePin = "";
+  updateRestoreDots();
+  document.getElementById("restorePinError").textContent = "";
+  document.getElementById("restorePinOverlay").classList.add("hidden");
 }
 
 // ── RENDER ─────────────────────────────────────────────────────────
@@ -1053,7 +1130,7 @@ function renderWaiter() {
   const cats = [...new Set(menu.map(i => i.cat))];
   document.getElementById("waiterView").innerHTML = cats.map(cat => {
     const items = menu.filter(i => i.cat === cat);
-    return `<div class="category-section">
+    return `<div class="category-section" id="waiter-cat-${cat.replace(/\s+/g,'-')}">
       <div class="category-header">
         <span class="category-name">${cat}</span>
         <div class="category-line"></div>
@@ -1072,6 +1149,8 @@ function renderWaiter() {
 
 // ── CATEGORY NAV ───────────────────────────────────────────────────
 function renderCatNav() {
+  // Use different ID prefix based on view
+  const prefix = currentView === "waiter" ? "waiter-cat-" : "cat-";
   const cats = [...new Set(menu.map(i => i.cat))];
   document.getElementById("catNav").innerHTML = cats.map(cat => {
     const hasOut = menu.some(i => i.cat === cat && i.status === "out");
@@ -1080,7 +1159,8 @@ function renderCatNav() {
 }
 
 function scrollToCat(cat) {
-  const id = "cat-" + cat.replace(/\s+/g, '-');
+  const prefix = currentView === "waiter" ? "waiter-cat-" : "cat-";
+  const id = prefix + cat.replace(/\s+/g, '-');
   document.getElementById(id)?.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
@@ -1095,8 +1175,6 @@ function updateStats() {
   document.getElementById("statTotal").textContent = menu.length;
 }
 
-document.getElementById("statOut").addEventListener("dblclick", restoreAll);
-
 // ── VIEW SWITCH ────────────────────────────────────────────────────
 function setView(v) {
   currentView = v;
@@ -1105,7 +1183,11 @@ function setView(v) {
   document.getElementById("managerView").classList.toggle("hidden", v !== "manager");
   document.getElementById("waiterView").classList.toggle("hidden", v !== "waiter");
   document.getElementById("managerToolbar").classList.toggle("hidden", v !== "manager");
-  document.getElementById("catNav").classList.toggle("hidden", v !== "manager");
+  
+  // Category nav is now ALWAYS visible for both views
+  document.getElementById("catNav").classList.remove("hidden");
+  
+  renderCatNav(); // Re-render cat nav with correct ID prefixes
   renderAll();
 }
 
@@ -1117,7 +1199,7 @@ function setFilter(f, btn) {
   renderAll();
 }
 
-// ── PIN LOGIN (FIXED) ──────────────────────────────────────────────
+// ── PIN LOGIN ──────────────────────────────────────────────────────
 function numPress(n) {
   if (pin.length >= 4) return;
   pin += n;
